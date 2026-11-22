@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getCaptcha, login } from '@/lib/api/auth';
 import { getUptime, isDownStatus, schoolSystemsStatus, statusLabel, type MonitorStatus } from '@/lib/api/school-site';
-import { useOutage } from '@/lib/outage';
+import { type Outage, useOutage } from '@/lib/outage';
 import { systemColor } from '@/lib/colors';
 import { SYSTEM_NAMES, useSchoolSystems as useSystems } from '@/components/system-status';
 import { readCaptcha } from '@/lib/captcha-ocr';
@@ -39,6 +39,7 @@ export default function LoginScreen() {
   const session = useSession();
   const passwordRef = useRef<TextInputInstance>(null);
   const [autofilled, setAutofilled] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState(session.studentId);
   const [password, setPassword] = useState('');
   // What the user typed over the auto-read code, tied to the captcha image it was typed for.
@@ -148,7 +149,10 @@ export default function LoginScreen() {
   const canSubmit = !!username.trim() && !!password && !submitting;
   // The app itself can't reach the portal (no internet, or sw not answering): signing in can't
   // work, so show only that and a retry instead of the form.
-  const blocked = useOutage('sw');
+  // Only while the portal hasn't answered this screen: a failure left over from earlier (e.g. a
+  // request cut off while the phone slept) mustn't hide a login form that loaded fine.
+  const outage = useOutage('sw');
+  const blocked = outage && !captchaQuery.isSuccess ? outage : null;
 
   return (
     <KeyboardAvoidingView behavior="padding" style={styles.root}>
@@ -183,7 +187,7 @@ export default function LoginScreen() {
           />
         ) : (
           <>
-            <PortalStatus />
+            <PortalStatus outage={outage?.kind === 'offline' ? outage : null} />
 
             <View style={styles.form}>
               <TextInput
@@ -201,22 +205,37 @@ export default function LoginScreen() {
                 onSubmitEditing={() => passwordRef.current?.focus()}
                 clearButtonMode="while-editing"
               />
-              <TextInput
-                ref={passwordRef}
-                // Remount once the saved password arrives: a secure field filled in from code may not
-                // draw its dots (seen in dark mode).
-                key={savedPassword ? 'saved' : 'typed'}
-                style={styles.input}
-                value={password}
-                onChangeText={setPassword}
-                placeholder="密碼"
-                placeholderTextColor={systemColor('placeholderText')}
-                secureTextEntry
-                textContentType="password"
-                autoComplete="current-password"
-                returnKeyType="go"
-                onSubmitEditing={() => void submit()}
-              />
+              <View style={styles.passwordRow}>
+                <TextInput
+                  ref={passwordRef}
+                  // Remount once the saved password arrives: a secure field filled in from code may not
+                  // draw its dots (seen in dark mode).
+                  key={savedPassword ? 'saved' : 'typed'}
+                  style={[styles.input, styles.passwordInput]}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="密碼"
+                  placeholderTextColor={systemColor('placeholderText')}
+                  secureTextEntry={!showPassword}
+                  textContentType="password"
+                  autoComplete="current-password"
+                  returnKeyType="go"
+                  onSubmitEditing={() => void submit()}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={showPassword ? '隱藏密碼' : '顯示密碼'}
+                  hitSlop={8}
+                  onPress={() => setShowPassword((v) => !v)}
+                  style={styles.eye}
+                >
+                  <SymbolView
+                    name={showPassword ? { ios: 'eye.slash', android: 'visibility_off' } : { ios: 'eye', android: 'visibility' }}
+                    size={20}
+                    tintColor={systemColor('secondaryLabel')}
+                  />
+                </Pressable>
+              </View>
 
               {showCaptcha ? (
                 <View style={styles.captchaRow}>
@@ -322,7 +341,7 @@ function SystemRows({ systems }: { systems: ReturnType<typeof schoolSystemsStatu
   );
 }
 
-function PortalStatus() {
+function PortalStatus({ outage }: { outage: Outage | null }) {
   const systems = useSystems();
   const uptime = useQuery({
     queryKey: ['uptime'],
@@ -334,7 +353,6 @@ function PortalStatus() {
   const down = portal && (portal.status === 'error' || portal.status === 'maintenance');
   const troubled = !!systems && (systems.sw !== 'success' || systems.siw !== 'success');
   const open = () => router.push('/status');
-  const outage = useOutage('sw');
 
   // What the app itself hit (no internet, sw not answering) takes precedence over the status page.
   const problem =
@@ -444,6 +462,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   form: { gap: 12 },
+  passwordRow: { justifyContent: 'center' },
+  passwordInput: { paddingRight: 52 },
+  eye: { position: 'absolute', right: 6, width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   notice: {
     flexDirection: 'row',
     gap: 10,

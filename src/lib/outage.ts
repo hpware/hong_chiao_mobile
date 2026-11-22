@@ -1,5 +1,6 @@
 import * as Network from 'expo-network';
 import { useSyncExternalStore } from 'react';
+import { AppState } from 'react-native';
 
 import { getCampusNetwork } from '@/lib/campus-network';
 import { getUptime } from '@/lib/api/school-site';
@@ -27,6 +28,14 @@ export type Outage = {
   /** A few words for inline errors (「無法載入：…」). */
   short: string;
 };
+
+// iOS cuts open connections when the app goes to the background, so requests that fail while
+// asleep or right after waking say nothing about the school's servers.
+let activeSince = AppState.currentState === 'active' ? 0 : Infinity;
+AppState.addEventListener('change', (state) => {
+  activeSince = state === 'active' ? Date.now() : Infinity;
+});
+const justWoke = () => Date.now() - activeSince < 5000;
 
 const listeners = new Set<(o: Outage) => void>();
 const lastShown: Partial<Record<SchoolSystem | 'offline', number>> = {};
@@ -163,6 +172,7 @@ export async function reportUnreachable(system: SchoolSystem): Promise<Outage> {
       short: `${name}沒有回應`,
     };
   }
+  if (justWoke()) return outage;
   reached[system] = false;
   setLatest(system, outage);
   const key = outage.kind === 'offline' ? 'offline' : system;

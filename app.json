@@ -1,14 +1,17 @@
 {
   "expo": {
-    "name": "hong_chiao_mobile",
-    "slug": "hong_chiao_mobile",
-    "version": "1.0.0",
+    "name": "管城市",
+    "slug": "hong-chiao-mobile",
+    "version": "0.13.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "hongchiaomobile",
+    "scheme": "hongchiao",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "tw.yhw.hongchiao",
+      "supportsTablet": true,
+      "buildNumber": "6"
     },
     "android": {
       "adaptiveIcon": {
@@ -17,11 +20,9 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
-    },
-    "web": {
-      "output": "server",
-      "favicon": "./assets/images/favicon.png"
+      "predictiveBackGestureEnabled": false,
+      "package": "tw.yhw.hongchiao",
+      "versionCode": 6
     },
     "plugins": [
       "expo-router",
@@ -32,7 +33,42 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "拍下請假或獎學金的佐證文件後上傳到學校系統。",
+          "photosPermission": "選擇照片作為請假或獎學金的佐證文件。",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-widgets",
+        {
+          "groupIdentifier": "group.tw.yhw.hongchiao",
+          "widgets": [
+            {
+              "name": "ScheduleWidget",
+              "displayName": "課表",
+              "description": "今天還有哪些課，或下一堂課。",
+              "ios": {
+                "supportedFamilies": [
+                  "systemSmall",
+                  "systemMedium",
+                  "systemLarge",
+                  "accessoryInline",
+                  "accessoryCircular",
+                  "accessoryRectangular"
+                ],
+                "initialLayout": "src/widgets/schedule-widget.tsx"
+              }
+            }
+          ]
+        }
+      ],
+      "./plugins/android-system-colors"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -36,6 +36,7 @@ export const ANDROID_ICONS: Record<string, ImageSourcePropType> = {
   'line.3.horizontal.decrease': require('@expo/material-symbols/filter_list.xml'),
   'list.number': require('@expo/material-symbols/format_list_numbered.xml'),
   'magnifyingglass': require('@expo/material-symbols/search.xml'),
+  map: require('@expo/material-symbols/map.xml'),
   'mappin.and.ellipse': require('@expo/material-symbols/location_on.xml'),
   'newspaper': require('@expo/material-symbols/newspaper.xml'),
   'paperclip': require('@expo/material-symbols/attach_file.xml'),

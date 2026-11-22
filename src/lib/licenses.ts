@@ -55,6 +55,14 @@ export const PROJECTS = [
     text: '原專案未附授權條款，著作權屬原作者 alaner652 所有。',
   },
   {
+    id: 'osm',
+    name: 'OpenStreetMap',
+    detail: 'ODbL · OpenStreetMap 貢獻者',
+    note: '校園地圖上的大樓位置與輪廓。',
+    url: 'https://www.openstreetmap.org/copyright',
+    text: '地圖資料 © OpenStreetMap 貢獻者，以開放資料庫授權條款（ODbL 1.0）授權：https://opendatacommons.org/licenses/odbl/1-0/',
+  },
+  {
     id: 'expo',
     name: 'Expo 範本',
     detail: 'MIT · 650 Industries, Inc. (aka Expo)',

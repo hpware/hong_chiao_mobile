@@ -38,6 +38,7 @@ export default function SchoolScreen() {
       </Section>
 
       <Section title="生活">
+        <NavRow title="校園地圖" subtitle="大樓位置、樓層與教室" icon="map" onPress={() => router.push('/campus-map')} />
         <NavRow title="信件" subtitle="收發室待領取的信件與包裹、領取紀錄" icon="envelope" onPress={() => router.push('/mail')} />
       </Section>
 

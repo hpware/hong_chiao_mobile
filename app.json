@@ -11,7 +11,7 @@
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "tw.yhw.hongchiao",
       "supportsTablet": true,
-      "buildNumber": "7"
+      "buildNumber": "9"
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +22,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "tw.yhw.hongchiao",
-      "versionCode": 7
+      "versionCode": 9
     },
     "plugins": [
       "expo-router",
@@ -68,7 +68,8 @@
           ]
         }
       ],
-      "./plugins/android-system-colors"
+      "./plugins/android-system-colors",
+      "expo-maps"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 
+import type { Href } from 'expo-router';
 import { LoadingRow, NavRow, Screen, Section, ValueRow } from '@/components/native';
+import { findRoom } from '@/lib/campus';
 import { getSchedule } from '@/lib/old/api';
 import { WEEKDAY_NAMES, weekBlocks } from '@/lib/old/schedule';
 
@@ -9,7 +11,7 @@ import { WEEKDAY_NAMES, weekBlocks } from '@/lib/old/schedule';
  * Pushing from inside this form sheet would stack the screen inside the sheet (no back button).
  * Close the sheet first, then open the screen normally on the main stack.
  */
-function openFromSheet(path: '/absence' | '/leaves') {
+function openFromSheet(path: Href) {
   router.back();
   setTimeout(() => router.push(path), 350);
 }
@@ -44,7 +46,16 @@ export default function CourseScreen() {
               <Section title="這堂課">
                 <ValueRow label="時間" value={`${WEEKDAY_NAMES[tapped.weekday]} ${tapped.start}–${tapped.end}`} icon="clock" />
                 <ValueRow label="節次" value={tapped.periods.join('、')} icon="list.number" />
-                <ValueRow label="教室" value={tapped.classroom} icon="mappin.and.ellipse" />
+                {tapped.classroom && findRoom(tapped.classroom) ? (
+                  <NavRow
+                    title="教室"
+                    detail={tapped.classroom}
+                    icon="mappin.and.ellipse"
+                    onPress={() => openFromSheet({ pathname: '/campus-map', params: { room: tapped.classroom } })}
+                  />
+                ) : (
+                  <ValueRow label="教室" value={tapped.classroom} icon="mappin.and.ellipse" />
+                )}
                 <ValueRow label="教師" value={tapped.teacher} icon="person" />
               </Section>
             ) : null}

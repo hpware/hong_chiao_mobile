@@ -54,6 +54,7 @@ function RootNavigator() {
           <Stack.Screen name="scholarship/document" options={{ title: '申請文件' }} />
           <Stack.Screen name="about" options={{ title: '關於' }} />
           <Stack.Screen name="licenses" options={{ title: '授權條款' }} />
+          <Stack.Screen name="campus-map" options={{ title: '校園地圖' }} />
           <Stack.Screen name="license" options={{ title: '授權條款' }} />
           <Stack.Screen name="change-password" options={{ title: '', presentation: 'formSheet', sheetGrabberVisible: true, sheetAllowedDetents: [0.75, 1] }} />
           <Stack.Screen name="tuition" options={{ title: '學費' }} />

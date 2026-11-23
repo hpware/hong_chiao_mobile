@@ -116,6 +116,7 @@ export default function LoginScreen() {
     } catch (e) {
       captchaQuery.refetch();
       // Typed the old system's password? Then keep it for siw and ask for the portal one.
+      // siw has no failed-login limit (sw does), so checking it here costs the student nothing.
       if (e instanceof ApiError && !isCaptchaRejection(e) && (await legacyAccepts({ uid: id, pwd }).catch(() => false))) {
         rememberLegacyAccount({ uid: id, pwd });
         setPassword('');

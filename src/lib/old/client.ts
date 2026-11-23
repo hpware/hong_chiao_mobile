@@ -14,7 +14,9 @@ export type { MultipartPart } from '@/lib/multipart';
  * Client for TPCU's legacy student system ("舊系統", siw), which still hosts 課表, 成績, 缺曠,
  * 獎懲, 請假 and ~50 other functions. Ported from the Agora-AI backend (`backend/src/client.py`).
  *
- * It uses the same student ID as the YB2K portal but has no captcha. Some students have a
+ * It uses the same student ID as the YB2K portal but has no captcha and, unlike the portal (sw),
+ * no limit on failed logins: checking a password here is free, while every wrong one sent to sw
+ * counts against the account. Some students have a
  * different password here, so once siw accepts a password it's saved in the iOS Keychain
  * (this device only, readable only while unlocked) and reused, so the app never asks again.
  * The native cookie store keeps its JSESSIONID (shared with the in-app browser for siw pages).

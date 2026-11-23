@@ -27,7 +27,8 @@ The login captcha is read on the device (`src/lib/captcha-ocr.ts`). The portal d
 fixed positions, so the reader keeps only the tinted digit pixels and matches each glyph against
 templates (`captcha-templates.ts`) built from captchas the portal confirmed. It read 20 of 20 unseen
 captchas correctly in testing. If the portal still rejects a code, the login screen fetches a new
-captcha and retries automatically (up to 3 times). Wrong passwords are never retried.
+captcha and retries automatically (up to 3 times). Wrong passwords are never retried: the portal (sw)
+limits failed logins, so each password is sent to it only once.
 
 ## Features ported
 
@@ -54,7 +55,9 @@ too; the reward schema is unknown).
 TPCU still serves 課表, 成績, 缺曠 and 請假 from its old system at `https://siw.tpcu.edu.tw/tsint`.
 `src/lib/old/*` ports the Agora-AI backend's client and parsers to run on the phone:
 
-- It logs in with the same student ID and password as YB2K (no captcha). The password stays in
+- It logs in with the same student ID and password as YB2K. Unlike the portal, it has no captcha
+  and no limit on failed logins, so the app tests passwords against siw freely (e.g. when the
+  portal rejects a password, it checks whether that's the siw one) instead of spending portal tries. The password stays in
   memory only, so an expired legacy session is renewed silently while the app is open.
 - The parsers are pure functions (`parsers.ts`) and were checked against real pages.
 - Leave applications mirror the website's own `go_save()` form (single day, multipart upload,

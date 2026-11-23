@@ -18,6 +18,8 @@ import {
   parseSchedule,
   parseMidterm,
   parseSelect,
+  parseTutorSurvey,
+  type SurveyQuestion,
   type LeaveEntry,
   type LeaveForm,
   type LeaveType,
@@ -339,4 +341,41 @@ export async function getTeacherTimetable(yms: string, unit: string, teacher: st
     ['tea_str1', teacher],
   ]);
   return parseTimetable(html);
+}
+
+// 導師輔導服務滿意度調查 -------------------------------------------------------------
+
+/** This semester's survey (BK054): the notice page first, then the form it leads to. */
+export async function getTutorSurvey() {
+  const notice = await openLegacyFunction('BK054');
+  if (!notice.includes('bk054_01')) return parseTutorSurvey(notice);
+  return parseTutorSurvey(await legacyPost('/tsint/bk_pro/bk054_01.jsp', []));
+}
+
+/** Weighs text the way the form's limit does: 中文 125 字 or 英文 250 字, i.e. CJK counts twice. */
+export function surveyTextLength(value: string) {
+  return [...value].reduce((n, ch) => n + (ch.charCodeAt(0) > 0xff ? 2 : 1), 0);
+}
+
+/**
+ * Sends the answers (question no → choice code, or text) the way the page's `go_next()` does:
+ * every answer is folded into one `content` field, `A#N#1#1($)…($)意見#Y#11#2`. Final: siw
+ * doesn't allow changes afterwards.
+ */
+export async function submitTutorSurvey(questions: SurveyQuestion[], answers: Record<string, string>) {
+  const fields: [string, string][] = [];
+  const parts: string[] = [];
+  for (const q of questions) {
+    const answer = answers[q.no] ?? '';
+    if (q.kind === 'choice') {
+      fields.push([`rdo_${q.no}`, `${answer}${q.tag}`], [`rdovalue${q.no}`, `${answer}#${q.tag}`]);
+      parts.push(`${answer}#${q.tag}`);
+    } else {
+      fields.push([`question${q.no}`, answer], [`quevalue${q.no}`, q.tag]);
+      parts.push(`${answer}#${q.tag}`);
+    }
+  }
+  fields.push(['content', parts.join('($)')], ['ls_hyperlink', '']);
+  const html = await legacyPost('/tsint/bk_pro/bk054_ins.jsp', fields);
+  return classifyAlert(html, ['完成', '成功', '存檔', '謝謝', '已送出'], ['失敗', '錯誤', '不得', '請輸入', '已填', '重複']);
 }

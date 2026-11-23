@@ -65,6 +65,7 @@ function RootNavigator() {
           <Stack.Screen name="grades" options={{ title: '成績' }} />
           <Stack.Screen name="absence" options={{ title: '缺曠紀錄' }} />
           <Stack.Screen name="leaves" options={{ title: '請假' }} />
+          <Stack.Screen name="tutor-survey" options={{ title: '導師滿意度調查' }} />
           <Stack.Screen name="leave-new" options={{ title: '新增假單', presentation: 'modal' }} />
           <Stack.Screen name="rewards" options={{ title: '獎懲' }} />
           <Stack.Screen name="legacy-all" options={{ title: '舊系統所有功能' }} />

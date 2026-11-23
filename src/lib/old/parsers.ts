@@ -548,3 +548,64 @@ export function parseTimetable(html: string): { courses: TimetableCourse[]; entr
     .sort((a, b) => a.weekday - b.weekday || a.time.localeCompare(b.time));
   return { courses, entries, empty: html.includes('目前沒有相關資料') || courses.length === 0 };
 }
+
+// ---------------------------------------------------------------------------
+// 導師輔導服務滿意度調查 (bk_pro/bk054_01.jsp)
+
+export type SurveyChoice = { code: string; label: string };
+export type SurveyQuestion =
+  | { kind: 'choice'; no: string; text: string; choices: SurveyChoice[]; tag: string }
+  | { kind: 'text'; no: string; text: string; note: string; required: boolean; tag: string };
+export type TutorSurvey =
+  | { open: true; title: string; teacher: string; questions: SurveyQuestion[] }
+  | { open: false; message: string };
+
+/**
+ * The survey form. Choice questions are radio groups (`rdo_N`, values like `AN#3#1`) with a
+ * hidden `rdovalueN` (`N#3#1`) whose tail is echoed back on submit; open questions are
+ * `questionN` textareas with a `quevalueN` tag (`Y#11#2`). An id ending in `N` means required.
+ * Returns `open: false` with the page's own message when there's no form (closed, or done).
+ */
+export function parseTutorSurvey(html: string): TutorSurvey {
+  const root = parse(html);
+  const form = root.querySelector('form[action*="bk054_ins"]');
+  if (!form) {
+    const alert = html.match(/alert\(['"]([^'"]+)['"]\)/)?.[1]?.replace(/\\n/g, '\n');
+    const body = root.querySelector('body');
+    body?.querySelectorAll('script').forEach((s) => s.remove());
+    return { open: false, message: (alert ?? (body ? text(body) : '')).trim() };
+  }
+  const title = text(form.querySelector('b') ?? form);
+  const teacher = (form.querySelectorAll('font').map(text).find((t) => t.startsWith('導師')) ?? '').replace(/^導師[:：]\s*/, '');
+  const questions: SurveyQuestion[] = [];
+  for (const row of form.querySelectorAll('tr')) {
+    const cells = row.childNodes.filter((n): n is HTMLElement => (n as HTMLElement).tagName === 'TD');
+    if (cells.length < 2 || !/^\d+$/.test(text(cells[0]))) continue;
+    const no = text(cells[0]);
+    const hidden = row.querySelector(`input[name="rdovalue${no}"]`);
+    if (hidden) {
+      const choices = row.querySelectorAll(`input[name="rdo_${no}"]`).map((input) => ({
+        code: (input.getAttribute('value') ?? '').slice(0, 1),
+        label: (input.parentNode as HTMLElement).text.replace(NBSP, '').trim(),
+      }));
+      questions.push({ kind: 'choice', no, text: text(cells[1]).replace(/^\d+\.\s*/, ''), choices, tag: hidden.getAttribute('value') ?? '' });
+      continue;
+    }
+    const area = row.querySelector(`textarea[name="question${no}"]`);
+    if (area) {
+      const fonts = row.querySelectorAll('font').map(text);
+      questions.push({
+        kind: 'text',
+        no,
+        text: (fonts[0] ?? '').replace(/[:：]$/, ''),
+        note: (fonts[1] ?? '').replace(/^[(（]|[)）]$/g, ''),
+        required: (area.getAttribute('id') ?? '').endsWith('N'),
+        tag: row.querySelector(`input[name="quevalue${no}"]`)?.getAttribute('value') ?? '',
+      });
+      continue;
+    }
+    // A question type this screen doesn't know (e.g. checkboxes): let the caller fall back.
+    throw new Error(`unsupported survey question ${no}`);
+  }
+  return { open: true, title, teacher, questions };
+}

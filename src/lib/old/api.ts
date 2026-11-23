@@ -19,6 +19,9 @@ import {
   parseMidterm,
   parseSelect,
   parseTutorSurvey,
+  parseEvaluationCourses,
+  parseEvaluationForm,
+  type EvaluationForm,
   type SurveyQuestion,
   type LeaveEntry,
   type LeaveForm,
@@ -378,4 +381,46 @@ export async function submitTutorSurvey(questions: SurveyQuestion[], answers: Re
   fields.push(['content', parts.join('($)')], ['ls_hyperlink', '']);
   const html = await legacyPost('/tsint/bk_pro/bk054_ins.jsp', fields);
   return classifyAlert(html, ['完成', '成功', '存檔', '謝謝', '已送出'], ['失敗', '錯誤', '不得', '請輸入', '已填', '重複']);
+}
+
+// 教學評量 -----------------------------------------------------------------------
+
+/** This semester's courses to evaluate (BG052), with which are done. */
+export async function getEvaluationCourses() {
+  return parseEvaluationCourses(await openLegacyFunction('BG052'));
+}
+
+/**
+ * One course's form. The page also loads a 核心能力 part in a frame (bg052_2_01.jsp); no course
+ * has had questions there so far, so a course that does is left to the website.
+ */
+export async function getEvaluationForm(arg: string) {
+  const form = parseEvaluationForm(await legacyPost('/tsint/bg_pro/bg052_01.jsp', [['arg', arg]]));
+  const core = await legacyPost('/tsint/bg_pro/bg052_2_01.jsp?', [['svalue', arg]]);
+  const count = (name: string) => Number(core.match(new RegExp(`name=${name} value="(\\d+)"`))?.[1] ?? 0);
+  if (count('code_no_y') + count('code_no_n') + count('ques_no_y') + count('ques_no_n') > 0) {
+    throw new Error('unsupported evaluation: core competencies');
+  }
+  return form;
+}
+
+/**
+ * Submits answers (question no → option value or text) the way the page's `save()` does: the
+ * codes of required choices, optional choices, required texts, then optional texts, joined by `$`,
+ * sent as `bg052_ins.jsp?svalue=…&content=…`. It answers `…@@訊息`.
+ */
+export async function submitEvaluation(form: EvaluationForm, answers: Record<string, string>) {
+  const questions = form.parts.flatMap((p) => p.questions);
+  const pick = (kind: 'choice' | 'text', required: boolean) =>
+    questions
+      .filter((q) => q.kind === kind && q.required === required)
+      .sort((a, b) => Number(a.index) - Number(b.index))
+      .map((q) => (q.kind === 'choice' ? (answers[q.no] ?? '') : q.tag + (answers[q.no] ?? '')));
+  const content = [...pick('choice', true), ...pick('choice', false), ...pick('text', true), ...pick('text', false)].join('$');
+  const html = await legacyPost(
+    `/tsint/bg_pro/bg052_ins.jsp?svalue=${encodeURIComponent(form.svalue)}&content=${encodeURIComponent(content)}`,
+    [],
+  );
+  const message = (html.split('@@')[1] ?? '').trim();
+  return { success: message.includes('完成'), message };
 }

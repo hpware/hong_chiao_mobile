@@ -12,6 +12,7 @@ const NATIVE: Record<string, Href> = {
   AK010: '/rewards',
   CK001: '/leaves',
   BK054: '/tutor-survey',
+  BG052: '/evaluations',
   ZGC201: '/bill',
   ZTT001: '/mail',
   AG203: '/course-search',

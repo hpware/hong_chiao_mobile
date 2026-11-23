@@ -614,3 +614,109 @@ export function parseTutorSurvey(html: string): TutorSurvey {
   }
   return { open: true, title, teacher, questions };
 }
+
+// ---------------------------------------------------------------------------
+// 教學評量 (bg_pro/bg052_00.jsp list, bg052_01.jsp form)
+
+export type EvaluationCourse = {
+  name: string;
+  group: string;
+  required: string;
+  credits: string;
+  teacher: string;
+  done: boolean;
+  /** `go_next()`'s argument, which opens the form; absent once done. */
+  arg?: string;
+};
+
+export function parseEvaluationCourses(html: string): EvaluationCourse[] {
+  const courses: EvaluationCourse[] = [];
+  for (const row of parse(html).querySelectorAll('tr')) {
+    const cells = row.querySelectorAll('td').map(text);
+    if (cells.length !== 7 || !/^【/.test(cells[2])) continue;
+    const arg = row.getAttribute('onclick')?.match(/go_next\('([^']+)'\)/)?.[1];
+    courses.push({
+      name: cells[0],
+      group: cells[1],
+      required: cells[3].replace(/[【】]/g, ''),
+      credits: cells[4],
+      teacher: cells[5],
+      done: cells[6].includes('完成'),
+      arg,
+    });
+  }
+  return courses;
+}
+
+export type EvaluationQuestion =
+  | { kind: 'choice'; no: string; text: string; required: boolean; index: string; options: { label: string; value: string }[] }
+  | { kind: 'text'; no: string; text: string; note: string; required: boolean; index: string; tag: string };
+export type EvaluationForm = {
+  course: string;
+  teacher: string;
+  /** Echoed back on submit (the course's `arg`). */
+  svalue: string;
+  parts: { title: string; questions: EvaluationQuestion[] }[];
+};
+
+/**
+ * The evaluation form. Required choices are radios `yradioK` whose onclick stores a code in
+ * `hyvalueK` (optional ones: `nradioK`/`hnvalueK`); open questions are `questionyK`/`questionnK`
+ * textareas whose answer is appended to the `hquesyK`/`hquesnK` code.
+ */
+export function parseEvaluationForm(html: string): EvaluationForm {
+  const root = parse(html);
+  const form = root.querySelector('form[action*="bg052_ins"]');
+  if (!form) throw new Error(text(root.querySelector('body') ?? root) || '舊系統沒有回應這份評量。');
+  const info = (label: string) =>
+    (root.querySelectorAll('font').map(text).find((t) => t.replace(/\s/g, '').startsWith(label)) ?? '').replace(/^[^：]*：/, '');
+  const parts: EvaluationForm['parts'] = [];
+  const part = () => (parts.at(-1) ?? (parts.push({ title: '', questions: [] }), parts.at(-1)!));
+  for (const row of form.querySelectorAll('tr')) {
+    const cells = row.childNodes.filter((n): n is HTMLElement => (n as HTMLElement).tagName === 'TD');
+    const heading = cells.length === 1 ? cells[0].querySelector('b') : null;
+    if (heading && /部份|部分/.test(text(heading))) {
+      parts.push({ title: text(heading), questions: [] });
+      continue;
+    }
+    if (cells.length < 2 || !/^\d+$/.test(text(cells[0]))) continue;
+    const no = text(cells[0]);
+    const radios = row.querySelectorAll('input[type=radio]');
+    if (radios.length) {
+      const name = radios[0].getAttribute('name') ?? '';
+      const [, field, index] = name.match(/^([yn])radio(\d+)$/) ?? [];
+      if (!field) throw new Error(`unsupported evaluation question ${no}`);
+      part().questions.push({
+        kind: 'choice',
+        no,
+        text: text(cells[1]),
+        required: field === 'y',
+        index,
+        options: radios.map((r) => ({
+          label: (r.parentNode as HTMLElement).text.replace(NBSP, '').trim(),
+          value: r.getAttribute('onclick')?.match(/get_[yn]value\('\d+','([^']*)'\)/)?.[1] ?? '',
+        })),
+      });
+      continue;
+    }
+    const area = row.querySelector('textarea');
+    const [, field, index] = (area?.getAttribute('id') ?? '').match(/^question([yn])(\d+)$/) ?? [];
+    if (!field) throw new Error(`unsupported evaluation question ${no}`);
+    const fonts = row.querySelectorAll('font').map(text);
+    part().questions.push({
+      kind: 'text',
+      no,
+      text: fonts[0] ?? '',
+      note: (fonts[1] ?? '').replace(/^[(（]|[)）]$/g, '').trim(),
+      required: field === 'y',
+      index,
+      tag: row.querySelector(`input[name="hques${field}${index}"]`)?.getAttribute('value') ?? '',
+    });
+  }
+  return {
+    course: info('科目'),
+    teacher: info('任課教師'),
+    svalue: form.querySelector('input[name=svalue]')?.getAttribute('value') ?? '',
+    parts: parts.filter((p) => p.questions.length),
+  };
+}

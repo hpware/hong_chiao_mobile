@@ -85,6 +85,8 @@ export type ScaleRowProps<T extends string> = {
   selection: T | '';
   options: readonly { label: string; value: T }[];
   onChange: (value: T) => void;
+  /** Choices too long to sit side by side: pick from a menu instead. */
+  menu?: boolean;
 };
 
 export type ToggleRowProps = {

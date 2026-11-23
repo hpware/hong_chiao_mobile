@@ -10,8 +10,6 @@ import type { SurveyQuestion } from '@/lib/old/parsers';
 
 const TEXT_LIMIT = 250;
 
-/** Five equal segments can't fit 非常不同意; 很 says the same in one character less. */
-const short = (label: string) => label.replace(/^非常/, '很');
 
 const openOnWeb = () =>
   router.replace({ pathname: '/legacy-web', params: { fncid: 'BK054', title: '導師輔導服務滿意度調查' } });
@@ -83,7 +81,7 @@ function SurveyForm({ title, teacher, questions }: { title: string; teacher: str
             key={q.no}
             title={`${q.no}. ${q.text}`}
             selection={answers[q.no] ?? ''}
-            options={q.choices.map((c) => ({ label: short(c.label), value: c.code }))}
+            options={q.choices.map((c) => ({ label: c.label, value: c.code }))}
             onChange={(v) => set(q.no, v)}
           />
         ))}

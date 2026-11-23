@@ -36,6 +36,7 @@ import {
   foregroundStyle,
   frame,
   aspectRatio,
+  background,
   clipShape,
   resizable,
   keyboardType,
@@ -258,17 +259,47 @@ export function PickerRow<T extends string>({ label, icon, selection, options, o
   );
 }
 
-export function ScaleRow<T extends string>({ title, selection, options, onChange }: ScaleRowProps<T>) {
+export function ScaleRow<T extends string>({ title, selection, options, onChange, menu }: ScaleRowProps<T>) {
+  if (menu) {
+    const choices = selection ? options : [{ label: '請選擇', value: '' }, ...options];
+    return (
+      <VStack alignment="leading" spacing={4} modifiers={[padding({ vertical: 6 })]}>
+        <Text>{title}</Text>
+        <Picker selection={selection} onSelectionChange={(value) => value && onChange(value as T)} modifiers={[pickerStyle('menu')]}>
+          {choices.map((o) => (
+            <Text key={o.value} modifiers={[tag(o.value)]}>
+              {o.label}
+            </Text>
+          ))}
+        </Picker>
+      </VStack>
+    );
+  }
+  // Equal-width buttons rather than a segmented control: labels may wrap to a second line, so a
+  // six-point scale keeps its full wording (稍微不同意) instead of being cut off.
   return (
-    <VStack alignment="leading" spacing={12} modifiers={[padding({ vertical: 6 })]}>
+    <VStack alignment="leading" spacing={10} modifiers={[padding({ vertical: 6 })]}>
       <Text>{title}</Text>
-      <Picker selection={selection} onSelectionChange={(value) => onChange(value as T)} modifiers={[pickerStyle('segmented')]}>
-        {options.map((o) => (
-          <Text key={o.value} modifiers={[tag(o.value)]}>
-            {o.label}
-          </Text>
-        ))}
-      </Picker>
+      <HStack spacing={5}>
+        {options.map((o) => {
+          const on = o.value === selection;
+          return (
+            <Button key={o.value} onPress={() => onChange(o.value)} modifiers={[buttonStyle('plain')]}>
+              <Text
+                modifiers={[
+                  font({ textStyle: 'footnote', weight: on ? 'semibold' : 'regular' }),
+                  multilineTextAlignment('center'),
+                  lineLimit(2),
+                  frame({ maxWidth: 10_000, minHeight: 44 }),
+                  foregroundStyle({ type: 'color', color: PlatformColor(on ? 'white' : 'label') }),
+                  background(PlatformColor(on ? 'systemBlue' : 'tertiarySystemFill'), shapes.roundedRectangle({ cornerRadius: 10 })),
+                ]}>
+                {o.label.replace(/^(非常|稍微)(.+)$/, '$1\n$2')}
+              </Text>
+            </Button>
+          );
+        })}
+      </HStack>
     </VStack>
   );
 }

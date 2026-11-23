@@ -1,19 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert } from 'react-native';
 
 import { ActionRow, Loading, LoadingRow, PickerRow, Screen, Section, Status, TextRow, WideRow } from '@/components/native';
 import { useCalendarColors, WeekView } from '@/components/week-grid';
-import {
-  getClasses,
-  getClassTimetable,
-  getClassTimetableOptions,
-  getTeacherTimetable,
-  getTeacherTimetableOptions,
-  type TimetableCourse,
-} from '@/lib/old/api';
-import { type CalendarBlock, coursePalette, hourRange, WEEKDAY_NAMES, weekBlocks } from '@/lib/old/schedule';
+import { getClasses, getClassTimetable, getClassTimetableOptions, getTeacherTimetable, getTeacherTimetableOptions, type TimetableCourse } from '@/lib/old/api';
+import { type CalendarBlock, coursePalette, hourRange, weekBlocks } from '@/lib/old/schedule';
 import type { ScheduleEntry } from '@/lib/old/parsers';
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -38,7 +30,11 @@ const MODES = [
 ] as const;
 
 function ClassTimetable({ onMode }: { onMode: (m: 'class' | 'teacher') => void }) {
-  const options = useQuery({ queryKey: ['legacy', 'class-tt-options'], queryFn: getClassTimetableOptions, staleTime: Infinity });
+  const options = useQuery({
+    queryKey: ['legacy', 'class-tt-options'],
+    queryFn: getClassTimetableOptions,
+    staleTime: Infinity,
+  });
   const [yms, setYms] = useState<string>();
   const [unit, setUnit] = useState(NONE);
   const [classId, setClassId] = useState(NONE);
@@ -76,7 +72,13 @@ function ClassTimetable({ onMode }: { onMode: (m: 'class' | 'teacher') => void }
           label="系所"
           icon="building.2"
           selection={unit}
-          options={[{ label: '請選擇', value: NONE }, ...options.data.units.map((u) => ({ label: u.label, value: u.value }))]}
+          options={[
+            { label: '請選擇', value: NONE },
+            ...options.data.units.map((u) => ({
+              label: u.label,
+              value: u.value,
+            })),
+          ]}
           onChange={(v) => {
             setUnit(v);
             setClassId(NONE);
@@ -90,13 +92,19 @@ function ClassTimetable({ onMode }: { onMode: (m: 'class' | 'teacher') => void }
               label="班級"
               icon="person.3"
               selection={classId}
-              options={[{ label: '請選擇', value: NONE }, ...(classes.data ?? []).map((c) => ({ label: c.name, value: c.id }))]}
+              options={[
+                { label: '請選擇', value: NONE },
+                ...(classes.data ?? []).map((c) => ({
+                  label: c.name,
+                  value: c.id,
+                })),
+              ]}
               onChange={setClassId}
             />
           )
         ) : null}
       </Section>
-      {classId ? <TimetableResult query={timetable} show="teacher" /> : null}
+      {classId ? <TimetableResult query={timetable} show="teacher" source={{ source: 'class', yms: semester, classId }} /> : null}
     </Screen>
   );
 }
@@ -105,7 +113,11 @@ function TeacherTimetable({ onMode }: { onMode: (m: 'class' | 'teacher') => void
   const [yms, setYms] = useState<string>();
   const [unit, setUnit] = useState(NONE);
   const [teacher, setTeacher] = useState(NONE);
-  const base = useQuery({ queryKey: ['legacy', 'teacher-tt-options'], queryFn: () => getTeacherTimetableOptions(), staleTime: Infinity });
+  const base = useQuery({
+    queryKey: ['legacy', 'teacher-tt-options'],
+    queryFn: () => getTeacherTimetableOptions(),
+    staleTime: Infinity,
+  });
   const semester = yms ?? base.data?.semesters.find((s) => s.selected)?.value ?? base.data?.semesters.at(-1)?.value ?? '';
   const teachers = useQuery({
     queryKey: ['legacy', 'teachers', semester, unit],
@@ -153,13 +165,19 @@ function TeacherTimetable({ onMode }: { onMode: (m: 'class' | 'teacher') => void
               label="教師"
               icon="person"
               selection={teacher}
-              options={[{ label: '請選擇', value: NONE }, ...(teachers.data?.teachers ?? []).map((t) => ({ label: t.label, value: t.value }))]}
+              options={[
+                { label: '請選擇', value: NONE },
+                ...(teachers.data?.teachers ?? []).map((t) => ({
+                  label: t.label,
+                  value: t.value,
+                })),
+              ]}
               onChange={setTeacher}
             />
           )
         ) : null}
       </Section>
-      {teacher ? <TimetableResult query={timetable} show="class" /> : null}
+      {teacher ? <TimetableResult query={timetable} show="class" source={{ source: 'teacher', yms: semester, unit, teacher }} /> : null}
     </Screen>
   );
 }
@@ -167,12 +185,16 @@ function TeacherTimetable({ onMode }: { onMode: (m: 'class' | 'teacher') => void
 type TimetableQuery = {
   isPending: boolean;
   error: Error | null;
-  data?: { courses: TimetableCourse[]; entries: ScheduleEntry[]; empty: boolean };
+  data?: {
+    courses: TimetableCourse[];
+    entries: ScheduleEntry[];
+    empty: boolean;
+  };
   refetch: () => unknown;
 };
 
 /** The week, day by day, then every course with its credits. */
-function TimetableResult({ query, show }: { query: TimetableQuery; show: 'teacher' | 'class' }) {
+function TimetableResult({ query, show, source }: { query: TimetableQuery; show: 'teacher' | 'class'; source: Record<string, string> }) {
   if (query.isPending) {
     return (
       <Section>
@@ -195,10 +217,16 @@ function TimetableResult({ query, show }: { query: TimetableQuery; show: 'teache
     );
   }
   const data = query.data;
-  const classOf = (course: string) => data.courses.find((c) => c.course === course)?.className ?? '';
-  const who = (b: CalendarBlock) => (show === 'teacher' ? b.teacher : classOf(b.course));
-  const open = (b: CalendarBlock) =>
-    Alert.alert(b.course, [`${WEEKDAY_NAMES[b.weekday]} ${b.start}–${b.end}`, b.classroom, who(b)].filter(Boolean).join('\n'));
+  // Same course sheet as the 課表 tab; it reads this timetable from the query cache.
+  const open = (b: Pick<CalendarBlock, 'course'> & Partial<CalendarBlock>) =>
+    router.push({
+      pathname: '/course',
+      params: {
+        ...source,
+        course: b.course,
+        ...(b.weekday === undefined ? {} : { weekday: String(b.weekday), start: b.start }),
+      },
+    });
   return (
     <>
       <Section title="週課表">

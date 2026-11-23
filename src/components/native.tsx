@@ -29,6 +29,7 @@ import type {
   StatsRowProps,
   ProfileRowProps,
   PickerRowProps,
+  ScaleRowProps,
   ScreenProps,
   SectionProps,
   StatusProps,
@@ -214,6 +215,22 @@ export function PickerRow<T extends string>({ label, icon, selection, options, o
         </Picker>
       }>
       <Text>{label}</Text>
+    </ListItem>
+  );
+}
+
+export function ScaleRow<T extends string>({ title, selection, options, onChange }: ScaleRowProps<T>) {
+  return (
+    <ListItem
+      supportingText={selection ? undefined : '請選擇'}
+      trailing={
+        <Picker selectedValue={selection} onValueChange={(v) => v && onChange(v as T)}>
+          {[{ label: '請選擇', value: '' }, ...options].map((o) => (
+            <Picker.Item key={o.value} label={o.label} value={o.value} />
+          ))}
+        </Picker>
+      }>
+      <Text>{title}</Text>
     </ListItem>
   );
 }

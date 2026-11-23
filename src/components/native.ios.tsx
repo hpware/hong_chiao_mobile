@@ -66,6 +66,7 @@ import type {
   StatsRowProps,
   ProfileRowProps,
   PickerRowProps,
+  ScaleRowProps,
   ScreenProps,
   SectionProps,
   StatusProps,
@@ -254,6 +255,21 @@ export function PickerRow<T extends string>({ label, icon, selection, options, o
         </Text>
       ))}
     </Picker>
+  );
+}
+
+export function ScaleRow<T extends string>({ title, selection, options, onChange }: ScaleRowProps<T>) {
+  return (
+    <VStack alignment="leading" spacing={12} modifiers={[padding({ vertical: 6 })]}>
+      <Text>{title}</Text>
+      <Picker selection={selection} onSelectionChange={(value) => onChange(value as T)} modifiers={[pickerStyle('segmented')]}>
+        {options.map((o) => (
+          <Text key={o.value} modifiers={[tag(o.value)]}>
+            {o.label}
+          </Text>
+        ))}
+      </Picker>
+    </VStack>
   );
 }
 

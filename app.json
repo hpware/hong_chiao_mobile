@@ -11,7 +11,7 @@
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "tw.yhw.hongchiao",
       "supportsTablet": true,
-      "buildNumber": "11"
+      "buildNumber": "12"
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +22,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "tw.yhw.hongchiao",
-      "versionCode": 11
+      "versionCode": 12
     },
     "plugins": [
       "expo-router",

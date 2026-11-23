@@ -4,11 +4,14 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert } from 'react-native';
 
-import { ActionRow, Loading, Screen, Section, SelectRow, Status, TextFieldRow, TextRow } from '@/components/native';
+import { ActionRow, Loading, ScaleRow, Screen, Section, Status, TextFieldRow, TextRow } from '@/components/native';
 import { getTutorSurvey, submitTutorSurvey, surveyTextLength } from '@/lib/old/api';
 import type { SurveyQuestion } from '@/lib/old/parsers';
 
 const TEXT_LIMIT = 250;
+
+/** Five equal segments can't fit 非常不同意; 很 says the same in one character less. */
+const short = (label: string) => label.replace(/^非常/, '很');
 
 const openOnWeb = () =>
   router.replace({ pathname: '/legacy-web', params: { fncid: 'BK054', title: '導師輔導服務滿意度調查' } });
@@ -38,6 +41,8 @@ function SurveyForm({ title, teacher, questions }: { title: string; teacher: str
   const set = (no: string, value: string) => setAnswers((a) => ({ ...a, [no]: value }));
   const submit = useMutation({ mutationFn: () => submitTutorSurvey(questions, answers) });
 
+  const choices = questions.filter((q) => q.kind === 'choice');
+  const texts = questions.filter((q) => q.kind === 'text');
   const missing = questions.filter((q) => (q.kind === 'choice' || q.required) && !answers[q.no]?.trim());
   const tooLong = questions.some((q) => q.kind === 'text' && surveyTextLength(answers[q.no] ?? '') > TEXT_LIMIT);
 
@@ -67,17 +72,20 @@ function SurveyForm({ title, teacher, questions }: { title: string; teacher: str
       <Section>
         <TextRow title={title} meta={teacher ? `導師 ${teacher}` : undefined} />
       </Section>
-      {questions.map((q) =>
-        q.kind === 'choice' ? (
-          <Section key={q.no} title={`${q.no}. ${q.text}`}>
-            {q.choices.map((c) => (
-              <SelectRow key={c.code} title={c.label} selected={answers[q.no] === c.code} onPress={() => set(q.no, c.code)} />
-            ))}
-          </Section>
-        ) : (
-          <TextQuestion key={q.no} question={q} value={answers[q.no] ?? ''} onChange={(v) => set(q.no, v)} />
-        ),
-      )}
+      <Section>
+        {choices.map((q) => (
+          <ScaleRow
+            key={q.no}
+            title={`${q.no}. ${q.text}`}
+            selection={answers[q.no] ?? ''}
+            options={q.choices.map((c) => ({ label: short(c.label), value: c.code }))}
+            onChange={(v) => set(q.no, v)}
+          />
+        ))}
+      </Section>
+      {texts.map((q) => (
+        <TextQuestion key={q.no} question={q} value={answers[q.no] ?? ''} onChange={(v) => set(q.no, v)} />
+      ))}
       <Section footer={missing.length ? `還有 ${missing.length} 題沒有回答。` : '送出後就不能再修改。'}>
         <ActionRow
           title="送出問卷"

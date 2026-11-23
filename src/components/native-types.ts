@@ -78,6 +78,15 @@ export type PickerRowProps<T extends string> = {
   onChange: (value: T) => void;
 };
 
+/** A question answered on a short scale: the text, then the choices side by side. */
+export type ScaleRowProps<T extends string> = {
+  title: string;
+  /** `''` while unanswered. */
+  selection: T | '';
+  options: readonly { label: string; value: T }[];
+  onChange: (value: T) => void;
+};
+
 export type ToggleRowProps = {
   label: string;
   value: boolean;

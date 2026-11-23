@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * Sets the app version and bumps the build number everywhere iOS reads them, so every IPA is
+ * Sets the app version and bumps the build number everywhere iOS and Android read them, so every IPA is
  * distinguishable (AltStore and iOS compare CFBundleVersion when updating).
  *
  *   node scripts/bump-version.js          # same version, build + 1
  *   node scripts/bump-version.js 0.13.0   # new version, build + 1
  *
  * Writes app.json (expo.version, ios.buildNumber, android.versionCode), both Info.plists (the app
- * and the widget extension must match) and the widget target's build settings.
+ * and the widget extension must match), the widget target's build settings and android/app/build.gradle.
  */
 const fs = require('fs');
 const path = require('path');
@@ -48,6 +48,15 @@ if (fs.existsSync(pbxPath)) {
     .replace(/CURRENT_PROJECT_VERSION = [^;]+;/g, `CURRENT_PROJECT_VERSION = ${build};`)
     .replace(/MARKETING_VERSION = [^;]+;/g, `MARKETING_VERSION = ${version};`);
   fs.writeFileSync(pbxPath, pbx);
+}
+
+const gradlePath = path.join(root, 'android/app/build.gradle');
+if (fs.existsSync(gradlePath)) {
+  const gradle = fs
+    .readFileSync(gradlePath, 'utf8')
+    .replace(/versionCode \d+/, `versionCode ${build}`)
+    .replace(/versionName "[^"]*"/, `versionName "${version}"`);
+  fs.writeFileSync(gradlePath, gradle);
 }
 
 console.log(`${version} (${build})`);

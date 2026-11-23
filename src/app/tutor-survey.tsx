@@ -30,7 +30,12 @@ export default function TutorSurveyScreen() {
     );
   }
   if (!survey.data.open) {
-    return <Status title="目前沒有要填的問卷" icon="checkmark.circle" message={survey.data.message || undefined} />;
+    const done = survey.data.message.includes('填寫完成');
+    return done ? (
+      <Status title="已填寫完成" icon="checkmark.circle" message="這學期的導師輔導服務滿意度調查已經送出了。" />
+    ) : (
+      <Status title="目前沒有要填的問卷" icon="checkmark.circle" message={survey.data.message || undefined} />
+    );
   }
   return <SurveyForm title={survey.data.title} teacher={survey.data.teacher} questions={survey.data.questions} />;
 }

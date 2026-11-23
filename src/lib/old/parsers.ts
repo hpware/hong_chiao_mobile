@@ -607,5 +607,10 @@ export function parseTutorSurvey(html: string): TutorSurvey {
     // A question type this screen doesn't know (e.g. checkboxes): let the caller fall back.
     throw new Error(`unsupported survey question ${no}`);
   }
+  // Already answered: siw still serves the form, but with only the title and 您已填寫完成！！
+  if (questions.length === 0) {
+    const page = text(form);
+    return { open: false, message: page.slice(page.indexOf(title) + title.length).trim() || page };
+  }
   return { open: true, title, teacher, questions };
 }

@@ -6,7 +6,6 @@ import {
   useQuery,
 } from '@tanstack/react-query';
 import { createContext, use, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Alert } from 'react-native';
 
 import { logoutRemote, renewTimer } from '@/lib/api/auth';
 import { clearPortalPassword } from '@/lib/credentials';
@@ -17,11 +16,7 @@ import {
   clearLegacyAccount,
   clearLegacySession,
   LegacyDownError,
-  LegacySessionEndedError,
-  onLegacySessionEnded,
-  reconnectLegacy,
   restoreLegacyAccount,
-  SESSION_ENDED_MESSAGE,
 } from '@/lib/old/client';
 import { clearScheduleWidget } from '@/widgets/sync-schedule-widget';
 import { getItem, removeItem, SCHOOL, setItem, StorageKeys } from '@/lib/storage';
@@ -52,7 +47,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const expire = useRef(() => {});
   // Several requests usually fail together; show one alert.
   const expiring = useRef(false);
-  const legacyPrompt = useRef(false);
   const statusRef = useRef(status);
   statusRef.current = status;
   useEffect(() => {
@@ -84,36 +78,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             staleTime: 60 * 1000,
             retry: (count, error) =>
               !(error instanceof SessionExpiredError) &&
-              !(error instanceof LegacySessionEndedError) &&
               !(error instanceof LegacyDownError) &&
               !(error instanceof SchoolDownError) &&
               count < 2,
           },
         },
       }),
-  );
-
-  // siw ended its session: ask before logging back in (see `reconnectLegacy`).
-  useEffect(
-    () =>
-      onLegacySessionEnded(() => {
-        if (legacyPrompt.current) return; // one prompt at a time
-        legacyPrompt.current = true;
-        const done = () => (legacyPrompt.current = false);
-        Alert.alert('舊系統已登出', SESSION_ENDED_MESSAGE, [
-          { text: '稍後', style: 'cancel', onPress: done },
-          {
-            text: '重新登入舊系統',
-            onPress: () => {
-              done();
-              reconnectLegacy()
-                .then(() => queryClient.invalidateQueries({ queryKey: ['legacy'] }))
-                .catch((e) => Alert.alert('無法登入舊系統', e instanceof Error ? e.message : String(e)));
-            },
-          },
-        ]);
-      }),
-    [queryClient],
   );
 
   useEffect(() => {

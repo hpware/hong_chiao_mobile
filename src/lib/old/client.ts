@@ -4,7 +4,7 @@ import { useSyncExternalStore } from 'react';
 import { ApiError, encodeForm, USER_AGENT, type FormFields } from '@/lib/http';
 import { buildMultipart, type MultipartPart } from '@/lib/multipart';
 import { systemAnswered } from '@/lib/outage';
-import { LegacyDownError, legacyOrigin, legacyOriginFailed, onLegacyOriginChange } from '@/lib/old/origin';
+import { legacyOrigin, legacyOriginFailed, onLegacyOriginChange } from '@/lib/old/origin';
 
 export { LegacyDownError, legacyOrigin, lastLegacyOrigin } from '@/lib/old/origin';
 
@@ -32,11 +32,6 @@ let menuHtml = '';
 export class LegacyUnavailableError extends ApiError {}
 /** siw rejected the student ID / password. */
 export class LegacyPasswordError extends LegacyUnavailableError {}
-/** The siw session ended on its own (idle timeout, or the account signed in/out elsewhere). */
-export class LegacySessionEndedError extends LegacyUnavailableError {}
-
-export const SESSION_ENDED_MESSAGE =
-  '可能是閒置太久，或這個帳號在其他地方（例如電腦）登入或登出了舊系統。為了不把你在其他地方的登入踢掉，App 不會自動重新登入。';
 
 export type LegacyAccount = { uid: string; pwd: string };
 
@@ -99,32 +94,8 @@ export function getLegacyStudentId() {
   return credentials?.uid ?? saved?.uid ?? '';
 }
 
-// Once a session dies, stay out until the user chooses to reconnect: siw allows one session per
-// account, so silently logging back in would keep kicking the user's other session (e.g. a PC).
-let sessionEnded = false;
-const endedListeners = new Set<() => void>();
-
-/** Called when the siw session ends unexpectedly, and again whenever something needs it meanwhile. */
-export function onLegacySessionEnded(listener: () => void) {
-  endedListeners.add(listener);
-  return () => void endedListeners.delete(listener);
-}
-
-function endSession() {
-  loggedIn = false;
-  sessionEnded = true;
-  endedListeners.forEach((l) => l());
-}
-
-/** The user chose to log back in to siw after being logged out. */
-export function reconnectLegacy() {
-  sessionEnded = false;
-  return ensureLegacySession();
-}
-
 function applyAccount(account: LegacyAccount | null) {
   credentials = account;
-  sessionEnded = false;
   loggedIn = false;
   pendingLogin = null;
   menuHtml = '';
@@ -278,7 +249,7 @@ async function login() {
   // (POST like the website does: a plain GET of this page stalls for ~20 s and drops the session.)
   const check = await send('POST', '/tsint/ck_pro/ck001_00.jsp', 'fncid=CK001', 'application/x-www-form-urlencoded');
   if (EXPIRED_MARKERS.some((m) => check.includes(m))) {
-    throw new ApiError('舊系統目前忙碌或無法登入，請稍後再試。');
+    throw new LegacyBusyError('舊系統目前忙碌或無法登入，請稍後再試。');
   }
   menuHtml = html;
   loggedIn = true;
@@ -298,10 +269,6 @@ export function onLegacyLogin(listener: (uid: string) => void) {
 /** Makes sure there's a live siw session (e.g. before opening an siw page in the in-app browser). */
 export function ensureLegacySession() {
   if (loggedIn) return Promise.resolve();
-  if (sessionEnded) {
-    endSession(); // ask again (e.g. after the user tapped 重試)
-    return Promise.reject(new LegacySessionEndedError('舊系統已登出。'));
-  }
   pendingLogin ??= login().finally(() => {
     pendingLogin = null;
   });
@@ -317,23 +284,38 @@ export async function getLegacyMenuHtml() {
 /**
  * Sends a request to siw, logging in first. If the host fails, tries once more on the next
  * working host (logging in there); if none works, the error says whether it's a known outage.
+ * If siw logged the session out (idle timeout, or the account used elsewhere), logs back in
+ * silently and resends: siw has no failed-login limit, so there's nothing to ask the user about.
+ * Only after MAX_RELOGINS failed re-logins does the caller get an error.
  */
 async function request(method: 'GET' | 'POST', path: string, body?: string | Uint8Array, contentType?: string): Promise<string> {
-  for (let attempt = 0; ; attempt++) {
+  let hostSwitched = false;
+  for (let relogins = 0; ; ) {
     try {
       await ensureLegacySession();
       const html = await send(method, path, body, contentType);
-      if (EXPIRED_MARKERS.some((m) => html.includes(m))) {
-        endSession();
-        throw new LegacySessionEndedError('舊系統已登出。');
-      }
-      return html;
+      if (!EXPIRED_MARKERS.some((m) => html.includes(m))) return html;
+      loggedIn = false;
+      throw new LoggedOutError('舊系統已登出。');
     } catch (e) {
-      if (!(e instanceof HostFailedError) || attempt > 0) throw e;
-      await legacyOrigin(); // throws LegacyDownError when no host answers
+      if (e instanceof HostFailedError && !hostSwitched) {
+        hostSwitched = true;
+        await legacyOrigin(); // throws LegacyDownError when no host answers
+        continue;
+      }
+      // Logged out, or siw busy while logging back in: try again. A wrong password won't fix itself.
+      if (!(e instanceof LoggedOutError || e instanceof LegacyBusyError)) throw e;
+      if (++relogins >= MAX_RELOGINS) throw new ApiError('舊系統登入失敗，請稍後再試。');
     }
   }
 }
+
+const MAX_RELOGINS = 5;
+
+/** siw answered with its login page: the session is gone. */
+class LoggedOutError extends ApiError {}
+/** siw accepted the password but didn't keep the session (it does this while busy). */
+class LegacyBusyError extends ApiError {}
 
 export function legacyPost(path: string, fields: FormFields) {
   return request('POST', path, encodeForm(fields), 'application/x-www-form-urlencoded');

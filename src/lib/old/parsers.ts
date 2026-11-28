@@ -341,11 +341,15 @@ export function parseLegacyMenu(html: string): LegacyFunction[] {
 // ---------------------------------------------------------------------------
 // 期中成績 (AG009)
 
-export type MidtermEntry = { course: string; score: string };
+export type MidtermEntry = { course: string; score: string; credits: string; required: string; note: string };
+
+/** What the 備註 marks on the 期中成績 page mean. */
+const MIDTERM_NOTES: Record<string, string> = { '#': '期中未排考試', '*': '不及格' };
 
 /**
  * Best effort: the page is only open for a few weeks a semester. Outside that window it just
- * says when it opens (`notice`); otherwise reads the table with 科目 / 成績 headers.
+ * says when it opens (`notice`); otherwise reads the table with 科目 / 成績 headers
+ * (written 「科　目」, so headers are compared with all whitespace removed).
  */
 export function parseMidterm(html: string): { notice: string; entries: MidtermEntry[] } {
   const root = parse(html);
@@ -355,15 +359,27 @@ export function parseMidterm(html: string): { notice: string; entries: MidtermEn
   for (const table of root.querySelectorAll('table')) {
     if (table.querySelector('table')) continue;
     const rows = table.querySelectorAll('tr').map((r) => r.querySelectorAll('td, th').map((c) => c.text.replace(/[\s\u3000]+/g, ' ').trim()));
-    const headerIndex = rows.findIndex((r) => r.some((c) => c.includes('科目')) && r.some((c) => /成績|分數/.test(c)));
+    const squash = (r: string[]) => r.map((c) => c.replace(/ /g, ''));
+    const headerIndex = rows.findIndex((r) => squash(r).includes('科目') && squash(r).some((c) => /成績|分數/.test(c)));
     if (headerIndex < 0) continue;
-    const header = rows[headerIndex];
-    const courseCol = header.findIndex((c) => c.includes('科目'));
-    const scoreCol = header.findIndex((c) => /期中|成績|分數/.test(c) && !c.includes('科目'));
+    const header = squash(rows[headerIndex]);
+    const col = (re: RegExp) => header.findIndex((c) => re.test(c));
+    const courseCol = header.indexOf('科目');
+    const scoreCol = col(/^(期中)?(成績|分數)$/);
+    const creditsCol = col(/學分/);
+    const requiredCol = col(/課別|必選/);
+    const noteCol = col(/備註/);
     for (const r of rows.slice(headerIndex + 1)) {
       const course = r[courseCol];
       if (!course || r.length !== header.length) continue;
-      entries.push({ course: course.replace(/【[^】]*】/g, '').trim(), score: r[scoreCol] ?? '' });
+      const mark = noteCol < 0 ? '' : r[noteCol];
+      entries.push({
+        course: course.replace(/【[^】]*】/g, '').trim(),
+        score: r[scoreCol] ?? '',
+        credits: creditsCol < 0 ? '' : r[creditsCol],
+        required: requiredCol < 0 ? '' : r[requiredCol],
+        note: MIDTERM_NOTES[mark] ?? mark,
+      });
     }
   }
   return { notice, entries };

@@ -196,8 +196,9 @@ export default function GradesScreen() {
               <ValueRow
                 key={`${e.course}-${i}`}
                 label={e.course}
-                value={e.score || '—'}
-                tone={Number(e.score) < 60 ? 'destructive' : undefined}
+                subtitle={[e.required && `${e.required}修`, e.credits && `${e.credits} 學分`].filter(Boolean).join(' · ') || undefined}
+                value={e.score ? String(Number(e.score)) : e.note || '—'}
+                tone={e.score && Number(e.score) < 60 ? 'destructive' : e.score ? undefined : 'secondary'}
               />
             ))
           ) : (

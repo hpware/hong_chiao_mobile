@@ -356,12 +356,20 @@ export function parseMidterm(html: string): { notice: string; entries: MidtermEn
   const text = root.text.replace(/\s+/g, ' ');
   const notice = text.match(/期中成績[^。]*開放查詢。/)?.[0] ?? parseEmptyMessage(html);
   const entries: MidtermEntry[] = [];
-  for (const table of root.querySelectorAll('table')) {
-    if (table.querySelector('table')) continue;
-    const rows = table.querySelectorAll('tr').map((r) => r.querySelectorAll('td, th').map((c) => c.text.replace(/[\s\u3000]+/g, ' ').trim()));
-    const squash = (r: string[]) => r.map((c) => c.replace(/ /g, ''));
-    const headerIndex = rows.findIndex((r) => squash(r).includes('科目') && squash(r).some((c) => /成績|分數/.test(c)));
-    if (headerIndex < 0) continue;
+  const squash = (r: string[]) => r.map((c) => c.replace(/ /g, ''));
+  const isHeader = (r: string[]) => squash(r).includes('科目') && squash(r).some((c) => /成績|分數/.test(c));
+  const cells = (table: HTMLElement) =>
+    table.querySelectorAll('tr').map((r) => r.querySelectorAll('td, th').map((c) => c.text.replace(/[\s\u3000]+/g, ' ').trim()));
+  // The score table nests small tables in its 總修學分 row, so take the innermost table with the
+  // header rather than skipping every table that contains another (rows with nested cells don't
+  // match the header's width and are dropped below).
+  const table = root
+    .querySelectorAll('table')
+    .filter((t) => cells(t).some(isHeader))
+    .at(-1);
+  if (table) {
+    const rows = cells(table);
+    const headerIndex = rows.findIndex(isHeader);
     const header = squash(rows[headerIndex]);
     const col = (re: RegExp) => header.findIndex((c) => re.test(c));
     const courseCol = header.indexOf('科目');
@@ -372,7 +380,7 @@ export function parseMidterm(html: string): { notice: string; entries: MidtermEn
     for (const r of rows.slice(headerIndex + 1)) {
       const course = r[courseCol];
       if (!course || r.length !== header.length) continue;
-      const mark = noteCol < 0 ? '' : r[noteCol];
+      const mark = noteCol < 0 ? '' : r[noteCol].replace('＃', '#').replace('＊', '*');
       entries.push({
         course: course.replace(/【[^】]*】/g, '').trim(),
         score: r[scoreCol] ?? '',
